@@ -13,7 +13,6 @@ tables:
     description: >
       Individual buildings in Louisiana with flood risk scores, FEMA flood zone designations,
       and CDC social vulnerability data. Each row is one building.
-    primary_entity: building
     dimensions:
       - name: PARISH
         expr: PARISH
@@ -129,7 +128,6 @@ tables:
     description: >
       Parish-level aggregated flood risk statistics.
       One row per Louisiana parish (64 total).
-    primary_entity: parish
     dimensions:
       - name: PARISH
         expr: PARISH
