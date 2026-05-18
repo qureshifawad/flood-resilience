@@ -34,6 +34,9 @@ flood-resilience/
 │   └── flood_dashboard.py              ← Streamlit app (paste into Snowsight Streamlit)
 ├── semantic_model/
 │   └── flood_risk_model.yaml           ← Semantic model for Cortex Analyst
+├── agent/
+│   ├── flood_risk_agent_spec.json      ← Cortex Agent specification (structured + unstructured)
+│   └── create_agent.sql               ← SQL to create the agent in Snowflake
 └── data/
     ├── fema_nri/
     │   └── NRI_CensusTracts_Louisiana.csv   ← FEMA National Risk Index (1,376 LA tracts)
@@ -74,7 +77,9 @@ After running the notebook setup cells (Lab 1), upload data files to the stage:
 2. Select stage `FLOOD_DATA_STAGE`
 3. Upload `data/fema_nri/NRI_CensusTracts_Louisiana.csv` → path `nri/`
 4. Upload `data/cdc_svi/SVI_2022_LA.csv` → path `svi/`
-5. Upload the two PDFs from `data/policy_docs/` → stage `FLOOD_POLICY_DOCS`
+5. Upload `data/parish_centroids/LA_Parish_Centroids.csv` → path `parish/`
+6. Upload the two PDFs from `data/policy_docs/` → stage `FLOOD_POLICY_DOCS`
+7. Upload `semantic_model/flood_risk_model.yaml` → path `semantic/`
 
 ### Step 4 — Run the Notebook
 
@@ -96,6 +101,15 @@ Follow the notebook cells in order. Each cell has:
 2. Snowsight → **AI & ML → Cortex Analyst → New Chat**
 3. Select the YAML semantic model
 4. Ask questions like *"Which parish has the highest social vulnerability?"*
+
+### Step 7 — Deploy Cortex Agent (Structured + Unstructured)
+
+1. Run `agent/create_agent.sql` in a SQL worksheet
+2. Snowsight → **AI & ML → Snowflake Intelligence** → select `FLOOD_RISK_AGENT`
+3. The agent combines both structured data AND policy documents:
+   - *"Which parishes have the highest flood risk and what mitigation plans exist?"*
+   - *"What does the state plan say about levee projects in coastal parishes?"*
+   - *"How many buildings are at risk and what federal programs can help?"*
 
 ---
 
