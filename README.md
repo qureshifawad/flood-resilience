@@ -72,9 +72,10 @@ This gives you access to 2.3 billion building footprints worldwide.
 4. In the search bar, type **"Overture Maps - Buildings"**
 5. Find the listing by **CARTO** and click on it
 6. Click the blue **Get** button (top right)
-7. In the dialog, set the database name to **`OVERTURE_MAPS_BUILDINGS`**
-8. Click **Get** again to confirm
-9. Wait for the share to be mounted (takes ~30 seconds)
+7. In the dialog, click on options and then set the database name to **`OVERTURE_MAPS_BUILDINGS`**
+8. In the roles dropdown, select **PUBLIC**
+9. Click **Get** again to confirm
+10. Wait for the share to be mounted (takes ~30 seconds)
 
 > **How to verify:** Go to **Data → Databases** in the left sidebar. You should see `OVERTURE_MAPS_BUILDINGS` listed.
 
