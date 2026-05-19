@@ -1,14 +1,47 @@
 import streamlit as st
 from snowflake.snowpark.context import get_active_session
 import pandas as pd
+import pydeck as pdk
+import altair as alt
+import json
 
 session = get_active_session()
 
-st.set_page_config(page_title="Louisiana Flood Vulnerability", page_icon="🌊", layout="wide")
-st.title("🌊 Louisiana Flood Vulnerability Dashboard")
-st.caption("Powered by Snowflake | FEMA NRI · CDC SVI · Overture Maps Buildings · Cortex AI")
+st.set_page_config(page_title="Louisiana Flood Vulnerability", page_icon="\U0001F30A", layout="wide")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Parish Overview", "Building Explorer", "H3 Heatmap", "AI Insights"])
+st.markdown("""
+<style>
+    .block-container {padding-top: 1.5rem; padding-bottom: 1rem;}
+    [data-testid="stMetric"] {
+        background: #FFFFFF;
+        border: 1px solid #E3E8EE;
+        border-radius: 8px;
+        padding: 12px 16px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    [data-testid="stMetricLabel"] {color: #6E7681; font-size: 0.8rem; font-weight: 500;}
+    [data-testid="stMetricValue"] {color: #11567F; font-weight: 600;}
+    .stTabs [data-baseweb="tab-list"] {gap: 8px;}
+    .stTabs [data-baseweb="tab"] {
+        background: #F4F7FA;
+        border-radius: 8px 8px 0 0;
+        padding: 8px 20px;
+        border: 1px solid #E3E8EE;
+    }
+    .stTabs [aria-selected="true"] {
+        background: #FFFFFF;
+        border-bottom: 2px solid #29B5E8;
+    }
+    h1 {color: #11567F !important;}
+    h2, h3 {color: #11567F !important;}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("# \U0001F30A Louisiana Flood Vulnerability Dashboard")
+st.markdown("**FEMA NRI \u00b7 CDC SVI \u00b7 Overture Maps Buildings \u00b7 Cortex AI** | *Real-time flood risk intelligence*")
+st.markdown("---")
+
+tab1, tab2, tab3, tab4 = st.tabs(["\U0001F4CA Parish Overview", "\U0001F3E2 Building Explorer", "\U0001F5FA H3 Heatmap", "\U0001F916 AI Insights"])
 
 
 @st.cache_data(ttl=300)
@@ -25,92 +58,176 @@ def load_parish_summary():
 
 df_parish = load_parish_summary()
 
-
 # ── TAB 1: Parish Overview ────────────────────────────────────────────────────
 with tab1:
-    st.subheader("Parish-Level Flood Risk Summary")
-
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Parishes", f"{len(df_parish)}")
     col2.metric("Total Buildings", f"{df_parish['TOTAL_BUILDINGS'].sum():,.0f}")
     col3.metric("In Flood Zones", f"{df_parish['BUILDINGS_IN_SFHA'].sum():,.0f}")
     col4.metric("Statewide Annual Loss", f"${df_parish['TOTAL_EXPECTED_ANNUAL_LOSS'].sum():,.0f}")
 
-    st.markdown("---")
+    st.markdown("")
 
-    display = df_parish.copy()
-    display["TOTAL_EXPECTED_ANNUAL_LOSS"] = display["TOTAL_EXPECTED_ANNUAL_LOSS"].apply(
-        lambda x: f"${x:,.0f}" if pd.notna(x) else "N/A"
-    )
-    display["PCT_IN_SFHA"] = display["PCT_IN_SFHA"].apply(
-        lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A"
-    )
+    left, right = st.columns([1.2, 1])
+
+    with left:
+        chart_data = df_parish.head(15).copy()
+        bar = alt.Chart(chart_data).mark_bar(
+            cornerRadiusTopLeft=4, cornerRadiusTopRight=4,
+            color=alt.Gradient(gradient="linear", stops=[
+                alt.GradientStop(color="#E4584F", offset=0),
+                alt.GradientStop(color="#29B5E8", offset=1)
+            ], x1=0, x2=0, y1=1, y2=0)
+        ).encode(
+            x=alt.X("PARISH:N", sort="-y", title=None, axis=alt.Axis(labelAngle=-45, labelFontSize=10)),
+            y=alt.Y("PCT_IN_SFHA:Q", title="% Buildings in Flood Zone"),
+            tooltip=[
+                alt.Tooltip("PARISH:N", title="Parish"),
+                alt.Tooltip("PCT_IN_SFHA:Q", title="% in Flood Zone", format=".1f"),
+                alt.Tooltip("TOTAL_BUILDINGS:Q", title="Total Buildings", format=","),
+            ]
+        ).properties(height=350, title="Top 15 Parishes by Flood Zone Exposure")
+
+        st.altair_chart(bar, use_container_width=True)
+
+    with right:
+        scatter = alt.Chart(df_parish).mark_circle(opacity=0.7).encode(
+            x=alt.X("AVG_NRI_RISK_SCORE:Q", title="NRI Risk Score"),
+            y=alt.Y("AVG_SVI_SCORE:Q", title="Social Vulnerability Index"),
+            size=alt.Size("TOTAL_BUILDINGS:Q", title="Buildings", scale=alt.Scale(range=[40, 400])),
+            color=alt.Color("AVG_COMPOSITE_SCORE:Q", title="Composite Score",
+                            scale=alt.Scale(range=["#29B5E8", "#11567F", "#E4584F"])),
+            tooltip=[
+                alt.Tooltip("PARISH:N"),
+                alt.Tooltip("AVG_COMPOSITE_SCORE:Q", format=".1f", title="Composite"),
+                alt.Tooltip("AVG_NRI_RISK_SCORE:Q", format=".1f", title="NRI"),
+                alt.Tooltip("AVG_SVI_SCORE:Q", format=".3f", title="SVI"),
+            ]
+        ).properties(height=350, title="Risk vs Vulnerability (bubble = building count)")
+
+        st.altair_chart(scatter, use_container_width=True)
 
     st.dataframe(
-        display.rename(columns={
+        df_parish.rename(columns={
             "PARISH": "Parish", "TOTAL_BUILDINGS": "Buildings",
-            "BUILDINGS_IN_SFHA": "In Flood Zone", "PCT_IN_SFHA": "% in Flood Zone",
-            "AVG_NRI_RISK_SCORE": "NRI Risk Score", "AVG_SVI_SCORE": "SVI Score",
-            "AVG_COMPOSITE_SCORE": "Composite Score",
-            "TOTAL_EXPECTED_ANNUAL_LOSS": "Annual Loss Exposure",
+            "BUILDINGS_IN_SFHA": "In Flood Zone", "PCT_IN_SFHA": "% Flood Zone",
+            "AVG_NRI_RISK_SCORE": "NRI Score", "AVG_SVI_SCORE": "SVI",
+            "AVG_COMPOSITE_SCORE": "Composite", "TOTAL_EXPECTED_ANNUAL_LOSS": "Annual Loss",
         }).drop(columns=["BUILDING_EXPECTED_ANNUAL_LOSS", "BUILDINGS_COASTAL_ZONE", "BUILDINGS_RIVERINE_ZONE"]),
-        use_container_width=True, height=450
+        use_container_width=True, height=350
     )
-
-    st.markdown("**Top 15 Parishes — % Buildings in Flood Zones**")
-    st.bar_chart(df_parish.head(15).set_index("PARISH")["PCT_IN_SFHA"], use_container_width=True, height=300)
 
 
 # ── TAB 2: Building Explorer ──────────────────────────────────────────────────
 with tab2:
-    st.subheader("Explore At-Risk Buildings by Parish")
-
-    col_a, col_b = st.columns(2)
+    col_a, col_b, col_c = st.columns([1, 1, 1])
     with col_a:
         parishes = ["(All)"] + sorted(df_parish["PARISH"].dropna().tolist())
-        selected_parish = st.selectbox("Select Parish", parishes)
+        selected_parish = st.selectbox("Parish", parishes)
     with col_b:
-        risk_threshold = st.slider("Minimum Composite Vulnerability Score", 0, 100, 50, step=5)
+        risk_threshold = st.slider("Min Vulnerability Score", 0, 100, 60, step=5)
+    with col_c:
+        max_buildings = st.select_slider("Max buildings on map", options=[100, 250, 500, 1000], value=500)
 
     @st.cache_data(ttl=60)
-    def load_buildings(parish, threshold):
-        where_parish = f"AND PARISH = '{parish}'" if parish != "(All)" else ""
+    def load_buildings_geo(parish, threshold, limit):
+        where_parish = f"AND r.PARISH = '{parish}'" if parish != "(All)" else ""
         return session.sql(f"""
-            SELECT BUILDING_NAME, CLASS, FLOOD_ZONE, ZONE_DESCRIPTION,
-                   COMPOSITE_VULNERABILITY_SCORE, NRI_RISK_SCORE,
-                   SVI_OVERALL, EXPECTED_ANNUAL_LOSS, LATITUDE, LONGITUDE, PARISH
-            FROM FLOOD_ANALYTICS.FLOOD.BUILDING_FLOOD_RISK
-            WHERE COMPOSITE_VULNERABILITY_SCORE >= {threshold}
+            SELECT r.BUILDING_NAME, r.CLASS, r.FLOOD_ZONE, r.PARISH,
+                   r.COMPOSITE_VULNERABILITY_SCORE, r.NRI_RISK_SCORE,
+                   r.SVI_OVERALL, r.EXPECTED_ANNUAL_LOSS,
+                   r.LATITUDE, r.LONGITUDE,
+                   ST_ASGEOJSON(b.GEOMETRY) AS GEOJSON
+            FROM FLOOD_ANALYTICS.FLOOD.BUILDING_FLOOD_RISK r
+            JOIN FLOOD_ANALYTICS.FLOOD.BUILDINGS_LA b ON r.BUILDING_ID = b.ID
+            WHERE r.COMPOSITE_VULNERABILITY_SCORE >= {threshold}
               {where_parish}
-            ORDER BY COMPOSITE_VULNERABILITY_SCORE DESC
-            LIMIT 2000
+            ORDER BY r.COMPOSITE_VULNERABILITY_SCORE DESC
+            LIMIT {limit}
         """).to_pandas()
 
-    df_bldg = load_buildings(selected_parish, risk_threshold)
+    df_bldg = load_buildings_geo(selected_parish, risk_threshold, max_buildings)
     label = f"in {selected_parish}" if selected_parish != "(All)" else "statewide"
-    st.metric(f"Buildings {label} above threshold", f"{len(df_bldg):,}")
+
+    m1, m2, m3 = st.columns(3)
+    m1.metric(f"Buildings {label}", f"{len(df_bldg):,}")
+    if not df_bldg.empty:
+        m2.metric("Avg Vulnerability", f"{df_bldg['COMPOSITE_VULNERABILITY_SCORE'].mean():.1f}")
+        m3.metric("Max Vulnerability", f"{df_bldg['COMPOSITE_VULNERABILITY_SCORE'].max():.1f}")
+
+    if not df_bldg.empty and "GEOJSON" in df_bldg.columns:
+        geo_df = df_bldg.dropna(subset=["GEOJSON"]).copy()
+        if not geo_df.empty:
+            geo_df["coordinates"] = geo_df["GEOJSON"].apply(lambda g: json.loads(g)["coordinates"])
+            geo_df["color_r"] = (geo_df["COMPOSITE_VULNERABILITY_SCORE"] / 100 * 255).clip(0, 255).astype(int)
+            geo_df["color_g"] = ((1 - geo_df["COMPOSITE_VULNERABILITY_SCORE"] / 100) * 200).clip(0, 255).astype(int)
+            geo_df["name"] = geo_df["BUILDING_NAME"].fillna("Unknown")
+            geo_df["vuln"] = geo_df["COMPOSITE_VULNERABILITY_SCORE"].round(1)
+            geo_df["zone"] = geo_df["FLOOD_ZONE"].fillna("N/A")
+            geo_df["bclass"] = geo_df["CLASS"].fillna("N/A")
+            geo_df["par"] = geo_df["PARISH"].fillna("N/A")
+
+            polygon_layer = pdk.Layer(
+                "PolygonLayer",
+                geo_df[["coordinates", "color_r", "color_g", "name", "vuln", "zone", "bclass", "par"]],
+                get_polygon="coordinates",
+                get_fill_color="[color_r, color_g, 60, 200]",
+                get_line_color=[255, 255, 255, 100],
+                line_width_min_pixels=1,
+                pickable=True,
+                auto_highlight=True,
+                highlight_color=[41, 181, 232, 160],
+                extruded=False,
+            )
+
+            view = pdk.ViewState(
+                latitude=geo_df["LATITUDE"].mean(),
+                longitude=geo_df["LONGITUDE"].mean(),
+                zoom=12,
+                pitch=0,
+                bearing=0,
+            )
+
+            tooltip = {
+                "text": "Building: {name}\nClass: {bclass}\nParish: {par}\nFlood Zone: {zone}\nVulnerability: {vuln}",
+                "style": {"backgroundColor": "#11567F", "color": "#FFFFFF",
+                          "fontSize": "12px", "borderRadius": "8px", "border": "1px solid #29B5E8"},
+            }
+
+            st.pydeck_chart(pdk.Deck(
+                layers=[polygon_layer],
+                initial_view_state=view,
+                tooltip=tooltip,
+                map_style="mapbox://styles/mapbox/dark-v10",
+            ))
 
     if not df_bldg.empty:
-        map_df = df_bldg[["LATITUDE", "LONGITUDE"]].dropna()
-        if not map_df.empty:
-            st.map(map_df, latitude="LATITUDE", longitude="LONGITUDE", zoom=7)
+        vuln_hist = alt.Chart(df_bldg).mark_bar(
+            cornerRadiusTopLeft=3, cornerRadiusTopRight=3
+        ).encode(
+            x=alt.X("COMPOSITE_VULNERABILITY_SCORE:Q", bin=alt.Bin(maxbins=20), title="Vulnerability Score"),
+            y=alt.Y("count():Q", title="Building Count"),
+            color=alt.Color("COMPOSITE_VULNERABILITY_SCORE:Q", bin=alt.Bin(maxbins=20),
+                            scale=alt.Scale(range=["#29B5E8", "#11567F", "#E4584F"]), legend=None),
+        ).properties(height=200, title="Vulnerability Score Distribution")
+
+        st.altair_chart(vuln_hist, use_container_width=True)
 
         st.dataframe(
             df_bldg.head(200).rename(columns={
                 "BUILDING_NAME": "Name", "CLASS": "Type", "FLOOD_ZONE": "Zone",
-                "COMPOSITE_VULNERABILITY_SCORE": "Vuln Score", "NRI_RISK_SCORE": "NRI Score",
+                "COMPOSITE_VULNERABILITY_SCORE": "Vuln Score", "NRI_RISK_SCORE": "NRI",
                 "SVI_OVERALL": "SVI", "EXPECTED_ANNUAL_LOSS": "Annual Loss", "PARISH": "Parish"
-            }).drop(columns=["ZONE_DESCRIPTION", "LATITUDE", "LONGITUDE"], errors="ignore"),
+            }).drop(columns=["ZONE_DESCRIPTION", "LATITUDE", "LONGITUDE", "GEOJSON"], errors="ignore"),
             use_container_width=True, height=300
         )
     else:
-        st.info("No buildings found matching the selected criteria.")
+        st.info("No buildings found matching the selected criteria. Try lowering the threshold.")
 
 
 # ── TAB 3: H3 Heatmap ────────────────────────────────────────────────────────
 with tab3:
-    st.subheader("H3 Hexagonal Vulnerability Heatmap")
-    st.markdown("Each hexagon = H3 resolution-6 cell (~36 km across). Colour reflects **avg composite vulnerability score**.")
+    st.markdown("Each hexagon is an **H3 resolution-6 cell** (~36 km\u00b2). Height and colour reflect average vulnerability.")
 
     @st.cache_data(ttl=300)
     def load_h3():
@@ -123,46 +240,83 @@ with tab3:
         """).to_pandas()
 
     df_h3 = load_h3()
+
+    if not df_h3.empty:
+        df_h3["COLOR_R"] = (df_h3["AVG_VULNERABILITY"] / 100 * 255).clip(0, 255).astype(int)
+        df_h3["COLOR_G"] = ((1 - df_h3["AVG_VULNERABILITY"] / 100) * 180).clip(0, 255).astype(int)
+        df_h3["COLOR_B"] = 60
+
+        layer = pdk.Layer(
+            "H3HexagonLayer",
+            df_h3,
+            get_hexagon="H3_INDEX_6",
+            get_fill_color="[COLOR_R, COLOR_G, COLOR_B, 180]",
+            extruded=False,
+            pickable=True,
+            auto_highlight=True,
+        )
+
+        view_state = pdk.ViewState(latitude=30.5, longitude=-91.5, zoom=6, pitch=0, bearing=0)
+
+        tooltip = {
+            "text": "Parish: {PRIMARY_PARISH}\nVulnerability: {AVG_VULNERABILITY}\nBuildings: {BUILDING_COUNT}\nAt Risk: {BUILDINGS_AT_RISK}\nAnnual Loss: ${TOTAL_EAL}",
+            "style": {"backgroundColor": "#11567F", "color": "#FFFFFF",
+                      "fontSize": "12px", "borderRadius": "8px"},
+        }
+
+        st.pydeck_chart(pdk.Deck(
+            layers=[layer],
+            initial_view_state=view_state,
+            tooltip=tooltip,
+            map_style="mapbox://styles/mapbox/dark-v10",
+        ))
+
+    st.markdown("---")
     c1, c2 = st.columns(2)
 
     with c1:
-        st.markdown("**Top 20 Highest-Risk Hexagons**")
-        st.dataframe(
-            df_h3.head(20).rename(columns={
-                "H3_INDEX_6": "H3 Cell", "PRIMARY_PARISH": "Parish",
-                "BUILDING_COUNT": "Buildings", "BUILDINGS_AT_RISK": "At Risk",
-                "AVG_VULNERABILITY": "Avg Vuln", "AVG_SVI": "Avg SVI", "TOTAL_EAL": "Total EAL"
-            }),
-            use_container_width=True, height=400
-        )
+        if not df_h3.empty:
+            df_h3["Risk Level"] = pd.cut(
+                df_h3["AVG_VULNERABILITY"], bins=[0, 25, 50, 75, 100],
+                labels=["Low", "Moderate", "High", "Critical"]
+            )
+            donut = alt.Chart(df_h3).mark_arc(innerRadius=50, cornerRadius=4).encode(
+                theta=alt.Theta("count():Q"),
+                color=alt.Color("Risk Level:N",
+                                scale=alt.Scale(domain=["Low", "Moderate", "High", "Critical"],
+                                                range=["#29B5E8", "#FFB647", "#11567F", "#E4584F"])),
+                tooltip=["Risk Level:N", "count():Q"]
+            ).properties(height=250, title="Hex Risk Distribution")
+            st.altair_chart(donut, use_container_width=True)
 
     with c2:
-        st.markdown("**Risk Distribution**")
-        if not df_h3.empty:
-            bins = pd.cut(df_h3["AVG_VULNERABILITY"], bins=[0, 25, 50, 75, 100],
-                          labels=["Low", "Moderate", "High", "Critical"])
-            st.bar_chart(bins.value_counts().sort_index(), use_container_width=True)
-            st.markdown(f"""
-**Summary**
-- Hexagons: {len(df_h3):,}
-- Avg vulnerability: {df_h3['AVG_VULNERABILITY'].mean():.1f}
-- Max vulnerability: {df_h3['AVG_VULNERABILITY'].max():.1f}
-            """)
+        st.markdown("**Top 10 Highest-Risk Hexagons**")
+        st.dataframe(
+            df_h3.head(10)[["H3_INDEX_6", "PRIMARY_PARISH", "BUILDING_COUNT",
+                            "BUILDINGS_AT_RISK", "AVG_VULNERABILITY", "TOTAL_EAL"]].rename(columns={
+                "H3_INDEX_6": "H3 Cell", "PRIMARY_PARISH": "Parish",
+                "BUILDING_COUNT": "Buildings", "BUILDINGS_AT_RISK": "At Risk",
+                "AVG_VULNERABILITY": "Vuln", "TOTAL_EAL": "Annual Loss"
+            }),
+            use_container_width=True, height=300
+        )
 
 
 # ── TAB 4: AI Insights ───────────────────────────────────────────────────────
 with tab4:
-    st.subheader("Ask Cortex AI About Flood Risk")
-    st.markdown("Ask any question about Louisiana flood vulnerability.  \nPowered by **Snowflake Cortex COMPLETE**.")
+    st.markdown("Ask questions about Louisiana flood vulnerability. Powered by **Snowflake Cortex AI**.")
 
-    for q in [
+    suggestions = [
         "Which parish has the highest percentage of buildings in flood zones?",
         "What is the total expected annual loss for the top 5 most vulnerable parishes?",
         "How does social vulnerability correlate with flood exposure?",
         "Which parishes should be prioritised for emergency preparedness?",
-        "What building types are most at risk in coastal flood zones?"
-    ]:
-        st.markdown(f"- *{q}*")
+    ]
+
+    cols = st.columns(2)
+    for i, q in enumerate(suggestions):
+        with cols[i % 2]:
+            st.markdown(f"*\U0001F4AC {q}*")
 
     user_question = st.text_input("Your question:", placeholder="e.g. Which parish has the most critical infrastructure at risk?")
 
@@ -184,7 +338,6 @@ with tab4:
             st.write(result["ANSWER"].iloc[0])
 
     st.markdown("---")
-    st.subheader("Key Statistics")
 
     @st.cache_data(ttl=300)
     def load_kpis():
@@ -201,9 +354,9 @@ with tab4:
     kpis = load_kpis()
     k1, k2, k3 = st.columns(3)
     k4, k5, k6 = st.columns(3)
-    k1.metric("Most Vulnerable Parish",       kpis["MOST_VULNERABLE"].iloc[0])
-    k2.metric("Most in Flood Zone",           kpis["MOST_IN_FLOOD_ZONE"].iloc[0])
+    k1.metric("Most Vulnerable Parish", kpis["MOST_VULNERABLE"].iloc[0])
+    k2.metric("Most in Flood Zone", kpis["MOST_IN_FLOOD_ZONE"].iloc[0])
     k3.metric("Highest Social Vulnerability", kpis["HIGHEST_SVI"].iloc[0])
-    k4.metric("Highest Annual Loss Parish",   kpis["HIGHEST_EAL"].iloc[0])
-    k5.metric("Statewide Annual Loss",        f"${kpis['STATEWIDE_EAL'].iloc[0]:,.0f}")
-    k6.metric("Buildings in Flood Zones",     f"{int(kpis['TOTAL_SFHA_BLDGS'].iloc[0]):,}")
+    k4.metric("Highest Annual Loss", kpis["HIGHEST_EAL"].iloc[0])
+    k5.metric("Statewide Annual Loss", f"${kpis['STATEWIDE_EAL'].iloc[0]:,.0f}")
+    k6.metric("Buildings in Flood Zones", f"{int(kpis['TOTAL_SFHA_BLDGS'].iloc[0]):,}")

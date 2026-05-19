@@ -179,6 +179,7 @@ tables:
 verified_queries:
   - name: most_vulnerable_parishes
     question: "Which parishes have the highest composite flood vulnerability score?"
+    use_as_onboarding_question: true
     sql: |
       SELECT PARISH, AVG_COMPOSITE_SCORE, AVG_NRI_RISK_SCORE, AVG_SVI_SCORE,
              PCT_IN_SFHA, TOTAL_EXPECTED_ANNUAL_LOSS
@@ -188,6 +189,7 @@ verified_queries:
 
   - name: buildings_in_flood_zones
     question: "How many buildings are in FEMA Special Flood Hazard Areas by parish?"
+    use_as_onboarding_question: true
     sql: |
       SELECT PARISH, BUILDINGS_IN_SFHA, TOTAL_BUILDINGS, PCT_IN_SFHA
       FROM FLOOD_ANALYTICS.FLOOD.PARISH_FLOOD_SUMMARY
@@ -195,6 +197,7 @@ verified_queries:
 
   - name: critical_infra_at_risk
     question: "How many hospitals and schools are in flood zones?"
+    use_as_onboarding_question: true
     sql: |
       SELECT CLASS, COUNT(*) AS TOTAL,
              SUM(CASE WHEN IN_SPECIAL_FLOOD_HAZARD_AREA THEN 1 ELSE 0 END) AS IN_SFHA,
@@ -206,6 +209,7 @@ verified_queries:
 
   - name: high_svi_flood_overlap
     question: "Which parishes have both high social vulnerability and high flood exposure?"
+    use_as_onboarding_question: true
     sql: |
       SELECT PARISH, AVG_SVI_SCORE, PCT_IN_SFHA, AVG_COMPOSITE_SCORE
       FROM FLOOD_ANALYTICS.FLOOD.PARISH_FLOOD_SUMMARY
@@ -215,6 +219,7 @@ verified_queries:
 
   - name: total_annual_loss
     question: "What is the total expected annual loss statewide?"
+    use_as_onboarding_question: true
     sql: |
       SELECT
         SUM(TOTAL_EXPECTED_ANNUAL_LOSS)      AS STATEWIDE_TOTAL_EAL,

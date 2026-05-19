@@ -30,22 +30,28 @@ An end-to-end flood vulnerability analysis platform built on Snowflake, combinin
 
 ```
 flood-resilience/
+├── .snowflake/cortex/skills/
+│   └── deploy-streamlit-flood-dashboard/
+│       └── SKILL.md                        ← Cortex Code skill for deterministic deployment
 ├── notebooks/
-│   └── flood_vulnerability_hol.ipynb   ← Main HOL notebook (Labs 1-8)
+│   └── flood_vulnerability_hol.ipynb       ← Main HOL notebook (Labs 1-8)
 ├── streamlit/
-│   └── flood_dashboard.py              ← Streamlit app (4 tabs)
+│   ├── .streamlit/
+│   │   └── config.toml                    ← Snowflake brand theme (buttons, colours)
+│   ├── flood_dashboard.py                 ← Streamlit app (pydeck maps + altair charts)
+│   └── environment.yml                    ← Package dependencies (pydeck, altair, pandas)
 ├── semantic_model/
-│   └── flood_risk_model.yaml           ← Semantic model for Cortex Analyst
+│   └── flood_risk_model.yaml              ← Semantic model for Cortex Analyst
 ├── agent/
-│   ├── flood_risk_agent_spec.json      ← Cortex Agent spec (structured + unstructured)
-│   └── create_agent.sql               ← SQL to create the agent
+│   ├── flood_risk_agent_spec.json         ← Cortex Agent spec (structured + unstructured)
+│   └── create_agent.sql                   ← SQL to create the agent
 ├── data/
 │   ├── fema_nri/
-│   │   └── NRI_CensusTracts_Louisiana.csv   ← FEMA National Risk Index (1,376 tracts)
+│   │   └── NRI_CensusTracts_Louisiana.csv ← FEMA National Risk Index (1,376 tracts)
 │   ├── cdc_svi/
-│   │   └── SVI_2022_LA.csv                  ← CDC Social Vulnerability Index (1,379 tracts)
+│   │   └── SVI_2022_LA.csv               ← CDC Social Vulnerability Index (1,379 tracts)
 │   ├── parish_centroids/
-│   │   └── LA_Parish_Centroids.csv          ← 64 Louisiana parish centroids (lat/lon)
+│   │   └── LA_Parish_Centroids.csv       ← 64 Louisiana parish centroids (lat/lon)
 │   └── policy_docs/
 │       ├── Louisiana_Hazard_Mitigation_Plan_2024_Intro.pdf
 │       └── Louisiana_Hazard_Mitigation_Plan_2024_Strategies.pdf
@@ -81,93 +87,81 @@ This gives you access to 2.3 billion building footprints worldwide.
 
 ---
 
-### Step 2 — Import the Notebook
-
+### Step 2 — Create a Git Workspace
+This lab runs as a **Notebook in a Workspace** (not the legacy notebook experience). You'll connect the GitHub repo directly to a workspace.
+#### 2a. Create the Workspace from Git
 1. In Snowsight, click **Projects** in the left sidebar
-2. Click **Notebooks**
-3. Click the **+ → Import .ipynb file** button (top right)
-4. Browse to `notebooks/flood_vulnerability_hol.ipynb` from this repo
-5. In the dialog:
-   - Set **Database** = `FLOOD_ANALYTICS` (it will be created by the notebook)
-   - Set **Schema** = `FLOOD`
-6. Click **Create**
-
-> **Tip:** You can also create a SQL Worksheet and run the notebook cells manually if you prefer.
-
----
-
-### Step 3 — Upload Data Files to Snowflake Stages
-
-After running the first two cells in the notebook (which create the database and stage), you need to upload the CSV and PDF files.
-
-**Upload CSVs:**
-
-1. In Snowsight, click **Data** in the left sidebar
-2. Click **Add Data** (top right)
-3. Click **Load files into a Stage**
-4. Select database: `FLOOD_ANALYTICS`, schema: `FLOOD`, stage: `FLOOD_DATA_STAGE`
-5. Upload the following files to these paths:
-
-| File from this repo | Upload to stage path |
-|---|---|
-| `data/fema_nri/NRI_CensusTracts_Louisiana.csv` | `nri/` |
-| `data/cdc_svi/SVI_2022_LA.csv` | `svi/` |
-| `data/parish_centroids/LA_Parish_Centroids.csv` | `parish/` |
-| `semantic_model/flood_risk_model.yaml` | `semantic/` |
-
-**Upload PDFs:**
-
-6. Go back to **Data → Add Data → Load files into a Stage**
-7. Select stage: `FLOOD_POLICY_DOCS`
-8. Upload both files from `data/policy_docs/`:
-   - `Louisiana_Hazard_Mitigation_Plan_2024_Intro.pdf`
-   - `Louisiana_Hazard_Mitigation_Plan_2024_Strategies.pdf`
-
-> **How to verify:** Run `LIST @FLOOD_DATA_STAGE;` in a worksheet — you should see files in nri/, svi/, parish/, and semantic/ folders.
-
----
-
-### Step 4 — Run the Notebook (Labs 1-8)
-
-Run cells sequentially using **Shift+Enter**. The notebook is organized into 8 labs:
-
-| Lab | What It Does | Expected Time |
-|---|---|---|
-| Lab 1 | Creates database, schema, warehouse; extracts 3.56M LA buildings | 5-8 min |
-| Lab 2 | Loads FEMA NRI, CDC SVI, derives flood zones | 2-3 min |
-| Lab 3 | Spatial joins: buildings → parishes → risk scores | 5-8 min |
-| Lab 4 | Creates Dynamic Table for auto-refreshing risk alerts | 1 min |
-| Lab 5 | Parses policy PDFs, chunks text, creates Cortex Search | 2-3 min |
-| Lab 6 | Verifies tables for Cortex Analyst | 1 min |
-| Lab 7 | Verification for Streamlit dashboard | 1 min |
-| Lab 8 | Cleanup (optional — only run when done) | — |
-
-> **Total runtime: ~20-25 minutes** (most time is the building extraction in Lab 1)
-
----
-
-### Step 5 — Deploy the Streamlit Dashboard
-
-1. In Snowsight, click **Projects** in the left sidebar
-2. Click **Streamlit**
-3. Click **+ Streamlit App** (top right)
-4. Set:
-   - **App name**: `Flood Vulnerability Dashboard`
-   - **Database**: `FLOOD_ANALYTICS`
+2. Click **Workspaces**
+3. Click the **+** button (top right) → **Git Workspace**
+4. In the dialog:
+   - **Repository URL**: Paste the GitHub repo URL for this project
+   - **API Integration**: Click **+ Create a new API integration**
+     - **Integration name**: `FLOODS` (must be CAPITAL LETTERS)
+     - **Allowed domain**: `github.com`
+     - Click **Create**
+   - **Workspace name**: `flood-resilience` (or your preferred name)
+5. Click **Create**
+6. Wait for the workspace to sync with the repository
+#### 2b. Open the Notebook and Connect to a Service
+1. In the workspace file explorer, navigate to `notebooks/`
+2. Click on `flood_vulnerability_hol.ipynb`
+3. The notebook will open in the workspace notebook editor
+4. You will be prompted to connect to a service:
+   - Click **+ Create Service**
+   - Accept the default settings (or choose a name)
+   - Click **Create**
+   - Wait for the service to start (takes ~30 seconds)
+5. Set the notebook context:
+   - **Database**: `FLOOD_ANALYTICS` (will be created by the first cell)
    - **Schema**: `FLOOD`
-   - **Warehouse**: `FLOOD_WH`
-5. Delete the template code in the editor
-6. Paste the entire contents of `streamlit/flood_dashboard.py` from this repo
-7. Click **Run** (top right)
+   - **Warehouse**: `FLOOD_WH` (will be created by the first cell)
+> **Tip:** All files (data CSVs, PDFs, Streamlit app) are accessible directly from the workspace — no manual file uploads needed.
+---
+### Step 3 — Run the Notebook
+The notebook handles **everything automatically** — data uploads, table creation, and deployments are all done via `COPY FILES INTO` from the workspace. No manual file uploads are needed.
+Simply run the notebook cells in order (top to bottom). Each lab section is marked with a heading.
+| Lab | What it does | Time |
+|---|---|---|
+| Lab 1 | Setup database/warehouse + extract Louisiana buildings | 3-5 min |
+| Lab 2 | Load FEMA NRI + CDC SVI data from workspace to stage | 1 min |
+| Lab 3 | Build flood risk tables + parish summary | 2-4 min |
+| Lab 4 | Dynamic table for real-time alerts | 1 min |
+| Lab 5 | Upload policy PDFs + Cortex AI document intelligence | 2 min |
+| Lab 6 | Verify all tables for Cortex Analyst | 1 min |
+| Lab 7 | Streamlit dashboard deployment | 1 min |
+| Lab 8 | Deploy Cortex Agent | 1 min |
+> **Total runtime:** ~15-20 minutes on a MEDIUM warehouse.
 
+---
+### Step 4 — Deploy the Streamlit Dashboard
+The notebook includes a deployment cell that automates this, or you can run the SQL manually:
+```sql
+CREATE OR REPLACE STAGE FLOOD_ANALYTICS.FLOOD.STREAMLIT_STAGE
+  DIRECTORY = (ENABLE = TRUE)
+  ENCRYPTION = (TYPE = 'SNOWFLAKE_SSE');
+COPY FILES INTO @FLOOD_ANALYTICS.FLOOD.STREAMLIT_STAGE/
+FROM 'snow://workspace/USER$.PUBLIC."flood-resilience"/versions/live/'
+FILES=('streamlit/flood_dashboard.py', 'streamlit/environment.yml', 'streamlit/.streamlit/config.toml');
+CREATE OR REPLACE STREAMLIT FLOOD_ANALYTICS.FLOOD.FLOOD_VULNERABILITY_DASHBOARD
+  ROOT_LOCATION  = '@FLOOD_ANALYTICS.FLOOD.STREAMLIT_STAGE/streamlit'
+  MAIN_FILE      = 'flood_dashboard.py'
+  QUERY_WAREHOUSE = FLOOD_WH
+  TITLE          = 'Flood Vulnerability Dashboard';
+```
 **What you'll see — 4 tabs:**
 
 | Tab | Content |
 |---|---|
-| Parish Overview | Risk league table with composite scores, bar chart of top 15 |
-| Building Explorer | Interactive map of at-risk buildings, filterable by parish and score |
-| H3 Heatmap | Hexagonal vulnerability heatmap data (table + risk distribution chart) |
+| Parish Overview | Altair bar chart of flood zone exposure + bubble scatter (NRI vs SVI) |
+| Building Explorer | **Pydeck PolygonLayer** rendering actual building footprints colour-coded by vulnerability, with interactive tooltips |
+| H3 Heatmap | **Pydeck H3HexagonLayer** 2D hexagonal vulnerability heatmap + donut risk distribution |
 | AI Insights | Ask Cortex AI any question about flood risk; see key statistics |
+
+**Key features:**
+- **Snowflake brand styling** via `.streamlit/config.toml` — cyan buttons, clean white UI
+- **Building polygon rendering** — actual Overture Maps geometries from `BUILDINGS_LA.GEOMETRY`
+- **Altair charts** — gradient bar charts, scatter plots, histograms with interactive tooltips
+- **Pydeck maps** — `PolygonLayer` for buildings, `H3HexagonLayer` for hex heatmap
 
 **Try these questions in the AI Insights tab:**
 - *"Which parish has the highest percentage of buildings in flood zones?"*
@@ -292,6 +286,11 @@ Buildings         →   CDC SVI CSV           →   Cortex Search
 | `Cortex Search returns no results` | Run `ALTER STAGE FLOOD_POLICY_DOCS REFRESH;` then wait 60 seconds for indexing |
 | `H3_CELL_TO_BOUNDARY_WKT not found` | Use `ST_ASWKT(H3_CELL_TO_BOUNDARY(...))` instead — the notebook has been fixed |
 | `SVI shows negative values (-999)` | These are CDC sentinel values — the notebook filters them with `CASE WHEN >= 0` |
+| `st.pydeck_chart() got unexpected keyword argument 'height'` | Remove `height` parameter — not supported in Snowflake Streamlit runtime |
+| `st.map() got unexpected keyword argument 'latitude'` | Use pydeck instead of st.map |
+| All parishes show 100% in flood zones | `PCT_IN_SFHA` must use tract-level FLOOD_ZONES table, not the parish-level boolean |
+| Annual loss shows trillions | Use `MAX()` not `SUM()` for parish EAL (it's a parish-level value duplicated per building) |
+| Pydeck tooltips show `{field}` as literal text | Use `PolygonLayer` with flat dataframe, not `GeoJsonLayer` with nested properties |
 
 ---
 
