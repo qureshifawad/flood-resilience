@@ -73,12 +73,12 @@ flood-resilience/
 This gives you access to 2.3 billion building footprints worldwide.
 
 1. Log in to **Snowsight** (https://app.snowflake.com)
-2. Click **Data Products** in the left sidebar
-3. Click **Marketplace**
+2. Click **Marketplace** in the left sidebar
+3. Click **Snowflake Marketplace**
 4. In the search bar, type **"Overture Maps - Buildings"**
 5. Find the listing by **CARTO** and click on it
 6. Click the blue **Get** button (top right)
-7. In the dialog, click on options and then set the database name to **`OVERTURE_MAPS_BUILDINGS`**
+7. In the dialog, click on options and then set the database name to **`OVERTURE_MAPS_BUILDINGS`**. Make sure there is only one underscore between MAPS and BUILDINGS.
 8. In the roles dropdown, select **PUBLIC**
 9. Click **Get** again to confirm
 10. Wait for the share to be mounted (takes ~30 seconds)
