@@ -1004,7 +1004,9 @@ Question	What happens
 "Compare social vulnerability of Orleans vs Jefferson Parish"	Agent generates SQL comparison
 
 */
--- ============================================================ -- STEP 7B: Create Cortex Agent (Structured + Unstructured) -- Combines Cortex Analyst (SQL) + Cortex Search (policy docs) -- ============================================================ COPY FILES INTO @FLOOD_ANALYTICS.FLOOD.FLOOD_DATA_STAGE/semantic/ FROM 'snow://workspace/USER$.PUBLIC."flood-resilience"/versions/live/' FILES=('semantic_model/flood_risk_model.yaml');
+-- ============================================================ -- STEP 7B: Create Cortex Agent (Structured + Unstructured) -- Combines Cortex Analyst (SQL) + Cortex Search (policy docs) -- ============================================================ 
+
+COPY FILES INTO @FLOOD_ANALYTICS.FLOOD.FLOOD_DATA_STAGE/semantic/ FROM 'snow://workspace/USER$.PUBLIC."flood-resilience"/versions/live/' FILES=('semantic_model/flood_risk_model.yaml');
 
 CREATE OR REPLACE AGENT FLOOD_ANALYTICS.FLOOD.FLOOD_RISK_AGENT FROM SPECIFICATION
 ;
